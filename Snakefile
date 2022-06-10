@@ -49,10 +49,10 @@ if config['enable'].get('prepare_links_p_nom', False):
         script: 'scripts/prepare_links_p_nom.py'
 
 
-datafiles = ['ch_cantons.csv', 'je-e-21.03.02.xls', 
-            'eez/World_EEZ_v8_2014.shp', 'EIA_hydro_generation_2000_2014.csv', 
-            'hydro_capacities.csv', 'naturalearth/ne_10m_admin_0_countries.shp', 
-            'NUTS_2013_60M_SH/data/NUTS_RG_60M_2013.shp', 'nama_10r_3popgdp.tsv.gz', 
+datafiles = ['ch_cantons.csv', 'je-e-21.03.02.xls',
+            'eez/World_EEZ_v8_2014.shp', 'EIA_hydro_generation_2000_2014.csv',
+            'hydro_capacities.csv', 'naturalearth/ne_10m_admin_0_countries.shp',
+            'NUTS_2013_60M_SH/data/NUTS_RG_60M_2013.shp', 'nama_10r_3popgdp.tsv.gz',
             'nama_10r_3gdp.tsv.gz', 'corine/g250_clc06_V18_5.tif']
 
 
@@ -78,7 +78,7 @@ rule build_load_data:
     output: "resources/load.csv"
     log: "logs/build_load_data.log"
     script: 'scripts/build_load_data.py'
-    
+
 
 rule build_powerplants:
     input:
@@ -103,6 +103,7 @@ rule base_network:
         links_tyndp='data/links_tyndp.csv',
         country_shapes='resources/country_shapes.geojson',
         offshore_shapes='resources/offshore_shapes.geojson',
+        renewable_shapes='resources/renewable_shapes.geojson',
         europe_shape='resources/europe_shape.geojson'
     output: "networks/base.nc"
     log: "logs/base_network.log"
@@ -131,6 +132,30 @@ rule build_shapes:
     resources: mem_mb=500
     script: "scripts/build_shapes.py"
 
+rule build_renewable_shapes:
+    input:
+        country_shapes='resources/country_shapes.geojson',
+        offshore_shapes='resources/offshore_shapes.geojson'
+    output:
+        renewable_shapes = 'resources/renewable_shapes.geojson'
+    log: "logs/build_renewable_shapes.log"
+    threads: 1
+    resources: mem_mb=500
+    script: "scripts/build_renewable_shapes.py"
+
+rule build_bus_regions_renewable:
+    input:
+        renewable_shapes='resources/renewable_shapes.geojson',
+        offshore_shapes='resources/offshore_shapes.geojson',
+        base_network="networks/base.nc"
+    output:
+        regions_onshore="resources/regions_onshore_renewable.geojson",
+        regions_offshore="resources/regions_offshore_renewable.geojson"
+    log: "logs/build_bus_regions_renewable.log"
+    threads: 1
+    resources: mem_mb=1000
+    script: "scripts/build_bus_regions_renewable.py"
+
 
 rule build_bus_regions:
     input:
@@ -147,7 +172,7 @@ rule build_bus_regions:
 
 if config['enable'].get('build_cutout', False):
     rule build_cutout:
-        input: 
+        input:
             regions_onshore="resources/regions_onshore.geojson",
             regions_offshore="resources/regions_offshore.geojson"
         output: "cutouts/{cutout}.nc"
@@ -400,4 +425,3 @@ rule plot_p_nom_max:
     output: "results/plots/elec_s{simpl}_cum_p_nom_max_{clusts}_{techs}_{country}.{ext}"
     log: "logs/plot_p_nom_max/elec_s{simpl}_{clusts}_{techs}_{country}_{ext}.log"
     script: "scripts/plot_p_nom_max.py"
-
