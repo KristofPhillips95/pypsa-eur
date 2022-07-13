@@ -194,6 +194,10 @@ def distribute_clusters(n, n_clusters, focus_weights=None, solver_name="cbc",use
              .pipe(normed))
         N = n.buses.groupby(['ren_zone', 'sub_network']).size()
 
+    if not(len(N) == len(L)):
+        L = L.append(N[~N.index.isin(L.index)] * 0)
+
+
     assert n_clusters >= len(N) and n_clusters <= N.sum(), \
         f"Number of clusters must be {len(N)} <= n_clusters <= {N.sum()} for this selection of countries."
 
@@ -308,7 +312,7 @@ def clustering_for_n_clusters(n, n_clusters, custom_busmap=False, aggregate_carr
             #busmap.to_csv("busmap_raw_ren_zones.csv")
             clustering = get_clustering_from_busmap(
                 n, busmap,
-                bus_strategies=dict(country=_make_consense("Bus", "ren_zone")),
+                bus_strategies=dict(ren_zone=_make_consense("Bus", "ren_zone")),
                 aggregate_generators_weighted=True,
                 aggregate_generators_carriers=aggregate_carriers,
                 aggregate_one_ports=["Load", "StorageUnit"],
