@@ -150,14 +150,6 @@ idx = pd.IndexSlice
 
 logger = logging.getLogger(__name__)
 
-def wind_zone(row):
-    if (row.country == "BE") | (row.country == "NL") | (row.country == "LU") :
-        return "WZ1"
-    else:
-        return "WZ2"
-def attach_renewable_zone_to_network(n,ren_tech):
-    n["Wind_zone"] = n.buses.apply(lambda row: wind_zone(row), axis=1)
-
 
 def normed(x): return (x / x.sum()).fillna(0.)
 
@@ -179,18 +171,28 @@ def weighting_for_country(n, x):
     l = normed(load.reindex(b_i, fill_value=0))
 
     w = g + l
-    return (w * (100. / w.max())).clip(lower=1.).astype(int)
+    ##TODO What happens with nodes that have no load and no capacity. Currently they have unit weight
+    # , not sure what this means for the rest of the algorithm.
+    if w.max() == 0:
+        return (w * (100)).clip(lower=1.).astype(int)
+    else:
+        return (w * (100. / w.max())).clip(lower=1.).astype(int)
 
 
-def distribute_clusters(n, n_clusters, focus_weights=None, solver_name="cbc"):
+def distribute_clusters(n, n_clusters, focus_weights=None, solver_name="cbc",use_countries = True):
     """Determine the number of clusters per country"""
-
-    L = (n.loads_t.p_set.mean()
-         .groupby(n.loads.bus).sum()
-         .groupby([n.buses.country, n.buses.sub_network]).sum()
-         .pipe(normed))
-
-    N = n.buses.groupby(['country', 'sub_network']).size()
+    if use_countries == True:
+        L = (n.loads_t.p_set.mean()
+             .groupby(n.loads.bus).sum()
+             .groupby([n.buses.country, n.buses.sub_network]).sum()
+             .pipe(normed))
+        N = n.buses.groupby(['country', 'sub_network']).size()
+    else:
+        L = (n.loads_t.p_set.mean()
+             .groupby(n.loads.bus).sum()
+             .groupby([n.buses.ren_zone, n.buses.sub_network]).sum()
+             .pipe(normed))
+        N = n.buses.groupby(['ren_zone', 'sub_network']).size()
 
     assert n_clusters >= len(N) and n_clusters <= N.sum(), \
         f"Number of clusters must be {len(N)} <= n_clusters <= {N.sum()} for this selection of countries."
@@ -234,7 +236,7 @@ def distribute_clusters(n, n_clusters, focus_weights=None, solver_name="cbc"):
     return pd.Series(m.n.get_values(), index=L.index).round().astype(int)
 
 
-def busmap_for_n_clusters(n, n_clusters, solver_name, focus_weights=None, algorithm="kmeans", **algorithm_kwds):
+def busmap_for_n_clusters(n, n_clusters, solver_name, focus_weights=None, algorithm="kmeans",use_countries=True, **algorithm_kwds):
     if algorithm == "kmeans":
         algorithm_kwds.setdefault('n_init', 1000)
         algorithm_kwds.setdefault('max_iter', 30000)
@@ -243,7 +245,7 @@ def busmap_for_n_clusters(n, n_clusters, solver_name, focus_weights=None, algori
 
     n.determine_network_topology()
 
-    n_clusters = distribute_clusters(n, n_clusters, focus_weights=focus_weights, solver_name=solver_name)
+    n_clusters = distribute_clusters(n, n_clusters, focus_weights=focus_weights, solver_name=solver_name,use_countries=use_countries)
 
     def reduce_network(n, buses):
         nr = pypsa.Network()
@@ -260,21 +262,27 @@ def busmap_for_n_clusters(n, n_clusters, solver_name, focus_weights=None, algori
         weight = weighting_for_country(n, x)
 
         if algorithm == "kmeans":
-            return prefix + busmap_by_kmeans(n, weight, n_clusters[x.name], buses_i=x.index, **algorithm_kwds)
+            if x.name in n_clusters.keys():
+                return prefix + busmap_by_kmeans(n, weight, n_clusters[x.name], buses_i=x.index, **algorithm_kwds)
+            else:
+                return
         elif algorithm == "spectral":
             return prefix + busmap_by_spectral_clustering(reduce_network(n, x), n_clusters[x.name], **algorithm_kwds)
         elif algorithm == "louvain":
             return prefix + busmap_by_louvain(reduce_network(n, x), n_clusters[x.name], **algorithm_kwds)
         else:
             raise ValueError(f"`algorithm` must be one of 'kmeans', 'spectral' or 'louvain'. Is {algorithm}.")
-
-    return (n.buses.groupby(['country', 'sub_network'], group_keys=False)
-            .apply(busmap_for_country).squeeze().rename('busmap'))
+    if use_countries:
+        return (n.buses.groupby(['country', 'sub_network'], group_keys=False)
+                .apply(busmap_for_country).squeeze().rename('busmap'))
+    else:
+        return (n.buses.groupby(['ren_zone', 'sub_network'], group_keys=False)
+                .apply(busmap_for_country).squeeze().rename('busmap'))
 
 
 def clustering_for_n_clusters(n, n_clusters, custom_busmap=False, aggregate_carriers=None,
                               line_length_factor=1.25, potential_mode='simple', solver_name="cbc",
-                              algorithm="kmeans", extended_link_costs=0, focus_weights=None):
+                              algorithm="kmeans", extended_link_costs=0, focus_weights=None,use_countries = True):
     if potential_mode == 'simple':
         p_nom_max_strategy = pd.Series.sum
     elif potential_mode == 'conservative':
@@ -283,19 +291,33 @@ def clustering_for_n_clusters(n, n_clusters, custom_busmap=False, aggregate_carr
         raise AttributeError(f"potential_mode should be one of 'simple' or 'conservative' but is '{potential_mode}'")
 
     if not isinstance(custom_busmap, pd.Series):
-        busmap = busmap_for_n_clusters(n, n_clusters, solver_name, focus_weights, algorithm)
+        if use_countries == True:
+            busmap = busmap_for_n_clusters(n, n_clusters, solver_name, focus_weights, algorithm,use_countries)
+            #busmap.to_csv("busmap_raw_countries.csv")
+            clustering = get_clustering_from_busmap(
+                n, busmap,
+                bus_strategies=dict(country=_make_consense("Bus", "country")),
+                aggregate_generators_weighted=True,
+                aggregate_generators_carriers=aggregate_carriers,
+                aggregate_one_ports=["Load", "StorageUnit"],
+                line_length_factor=line_length_factor,
+                generator_strategies={'p_nom_max': p_nom_max_strategy, 'p_nom_min': pd.Series.sum},
+                scale_link_capital_costs=False)
+        else:
+            busmap = busmap_for_n_clusters(n, n_clusters, solver_name, focus_weights, algorithm,use_countries)
+            #busmap.to_csv("busmap_raw_ren_zones.csv")
+            clustering = get_clustering_from_busmap(
+                n, busmap,
+                bus_strategies=dict(country=_make_consense("Bus", "ren_zone")),
+                aggregate_generators_weighted=True,
+                aggregate_generators_carriers=aggregate_carriers,
+                aggregate_one_ports=["Load", "StorageUnit"],
+                line_length_factor=line_length_factor,
+                generator_strategies={'p_nom_max': p_nom_max_strategy, 'p_nom_min': pd.Series.sum},
+                scale_link_capital_costs=False)
     else:
         busmap = custom_busmap
 
-    clustering = get_clustering_from_busmap(
-        n, busmap,
-        bus_strategies=dict(country=_make_consense("Bus", "country")),
-        aggregate_generators_weighted=True,
-        aggregate_generators_carriers=aggregate_carriers,
-        aggregate_one_ports=["Load", "StorageUnit"],
-        line_length_factor=line_length_factor,
-        generator_strategies={'p_nom_max': p_nom_max_strategy, 'p_nom_min': pd.Series.sum},
-        scale_link_capital_costs=False)
 
     if not n.links.empty:
         nc = clustering.network
@@ -342,7 +364,7 @@ if __name__ == "__main__":
     if 'snakemake' not in globals():
         from _helpers import mock_snakemake
 
-        snakemake = mock_snakemake('cluster_network', network='elec', simpl='', clusters='37')
+        snakemake = mock_snakemake('cluster_network', network='elec', simpl='', clusters='64')
     configure_logging(snakemake)
 
     n = pypsa.Network(snakemake.input.network)
@@ -398,7 +420,7 @@ if __name__ == "__main__":
         clustering = clustering_for_n_clusters(n, n_clusters, custom_busmap, aggregate_carriers,
                                                line_length_factor, potential_mode,
                                                snakemake.config['solving']['solver']['name'],
-                                               "kmeans", hvac_overhead_cost, focus_weights)
+                                               "kmeans", hvac_overhead_cost, focus_weights,use_countries=False)
 
     update_p_nom_max(n)
 
