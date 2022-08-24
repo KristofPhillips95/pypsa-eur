@@ -20,11 +20,12 @@ Description
 """
 
 import logging
-from _helpers import (retrieve_snakemake_keys, load_network_for_plots,
+from _helpers import (load_network_for_plots,
                       aggregate_p, aggregate_costs, configure_logging)
 
 import pandas as pd
 import numpy as np
+import geopandas as gpd
 
 import cartopy.crs as ccrs
 import matplotlib.pyplot as plt
@@ -75,7 +76,7 @@ def set_plot_style():
                 }])
 
 
-def plot_map(n, ax=None, attribute='p_nom', opts={}):
+def plot_map(n, ax=None, attribute='p_nom',opts={},alt_regions = None):
     if ax is None:
         ax = plt.gca()
 
@@ -128,6 +129,11 @@ def plot_map(n, ax=None, attribute='p_nom', opts={}):
            ax=ax)
     ax.set_aspect('equal')
     ax.axis('off')
+    if isinstance(alt_regions,pd.DataFrame):
+        alt_regions.boundary[0]
+        alt_regions.plot()
+
+
 
     # Rasterize basemap
     # TODO : Check if this also works with cartopy
@@ -248,30 +254,34 @@ def plot_total_cost_bar(n, ax=None):
     ax.set_xticklabels([])
     ax.grid(True, axis="y", color='k', linestyle='dotted')
 
+def load_renewable_zones():
+    return gpd.read_file("..//resources//renewable_shapes.geojson")
 
 if __name__ == "__main__":
     if 'snakemake' not in globals():
         from _helpers import mock_snakemake
         snakemake = mock_snakemake('plot_network', network='elec', simpl='',
-                                  clusters='5', ll='copt', opts='Co2L-24H',
+                                  clusters='37',regions = 'a', ll='copt', opts='Co2L-24H',
                                   attr='p_nom', ext="pdf")
     configure_logging(snakemake)
-
+    opts = snakemake.config["plotting"]
     set_plot_style()
 
-    paths, config, wildcards, logs, out = retrieve_snakemake_keys(snakemake)
+    if snakemake.wildcards.regions == 'a':
+        alt_regions = load_renewable_zones()
+    config, wildcards = snakemake.config, snakemake.wildcards
 
-    map_figsize = config['map']['figsize']
-    map_boundaries = config['map']['boundaries']
+    map_figsize = config["plotting"]['map']['figsize']
+    map_boundaries = config["plotting"]['map']['boundaries']
 
-    n = load_network_for_plots(paths.network, paths.tech_costs, config)
+    n = load_network_for_plots(snakemake.input.network, snakemake.input.tech_costs, config)
 
     scenario_opts = wildcards.opts.split('-')
 
     fig, ax = plt.subplots(figsize=map_figsize, subplot_kw={"projection": ccrs.PlateCarree()})
-    plot_map(n, ax, wildcards.attr, config)
-
-    fig.savefig(out.only_map, dpi=150, bbox_inches='tight')
+    plot_map(n, ax, wildcards.attr,config['plotting'],alt_regions=alt_regions)
+    plt.show()
+    fig.savefig(snakemake.output.only_map, dpi=150, bbox_inches='tight')
 
     ax1 = fig.add_axes([-0.115, 0.625, 0.2, 0.2])
     plot_total_energy_pie(n, ax1)
@@ -287,4 +297,4 @@ if __name__ == "__main__":
     fig.suptitle('Expansion to {amount} {label} at {clusters} clusters'
                 .format(amount=amnt, label=lbl, clusters=wildcards.clusters))
 
-    fig.savefig(out.ext, transparent=True, bbox_inches='tight')
+    fig.savefig(snakemake.output.ext, transparent=True, bbox_inches='tight')

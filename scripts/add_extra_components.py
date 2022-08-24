@@ -88,14 +88,16 @@ def attach_storageunits(n, costs, elec_opts):
                cyclic_state_of_charge=True)
 
 
-def attach_stores(n, costs, elec_opts):
+def attach_stores(n, costs, elec_opts,use_countries = True):
     carriers = elec_opts['extendable_carriers']['Store']
 
     _add_missing_carriers_from_costs(n, costs, carriers)
 
     buses_i = n.buses.index
-    bus_sub_dict = {k: n.buses[k].values for k in ['x', 'y', 'country']}
-
+    if use_countries:
+        bus_sub_dict = {k: n.buses[k].values for k in ['x', 'y', 'country']}
+    else:
+        bus_sub_dict = {k: n.buses[k].values for k in ['x', 'y', 'ren_zone']}
     if 'H2' in carriers:
         h2_buses_i = n.madd("Bus", buses_i + " H2", carrier="H2", **bus_sub_dict)
 
@@ -190,8 +192,16 @@ if __name__ == "__main__":
     if 'snakemake' not in globals():
         from _helpers import mock_snakemake
         snakemake = mock_snakemake('add_extra_components', network='elec',
-                                  simpl='', clusters=5)
+                                  simpl='', clusters=37,regions = 'c')
     configure_logging(snakemake)
+
+    if snakemake.wildcards.regions.startswith('a'):
+        use_countries = False
+    elif snakemake.wildcards.regions == 'c':
+        use_countries = True
+    else:
+        raise  Exception(f"Regions must be either 'a' or  'c', currently {snakemake.wildcards.regions}")
+
 
     n = pypsa.Network(snakemake.input.network)
     elec_config = snakemake.config['electricity']
@@ -200,7 +210,7 @@ if __name__ == "__main__":
     costs = load_costs(snakemake.input.tech_costs, snakemake.config['costs'], elec_config, Nyears)
 
     attach_storageunits(n, costs, elec_config)
-    attach_stores(n, costs, elec_config)
+    attach_stores(n, costs, elec_config,use_countries)
     attach_hydrogen_pipelines(n, costs, elec_config)
 
     add_nice_carrier_names(n, snakemake.config)

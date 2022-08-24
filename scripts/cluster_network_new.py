@@ -368,7 +368,7 @@ if __name__ == "__main__":
     if 'snakemake' not in globals():
         from _helpers import mock_snakemake
 
-        snakemake = mock_snakemake('cluster_network', network='elec', simpl='', clusters='64')
+        snakemake = mock_snakemake('cluster_network', network='elec', simpl='', clusters='12', regions = 'a10')
     configure_logging(snakemake)
 
     n = pypsa.Network(snakemake.input.network)
@@ -380,6 +380,16 @@ if __name__ == "__main__":
     renewable_carriers = pd.Index([tech
                                    for tech in n.generators.carrier.unique()
                                    if tech in snakemake.config['renewable']])
+
+    if snakemake.wildcards.regions == 'c':
+        use_countries = True
+        print("Using default countries as supraclustering regions")
+    elif snakemake.wildcards.regions.startswith('a'):
+        use_countries = False
+        print("Using ren_zone as supraclustering regions")
+    else:
+        raise Exception(f"Regions must be either 'a+number' or  'c', currently {snakemake.wildcards.regions}")
+
 
     if snakemake.wildcards.clusters.endswith('m'):
         n_clusters = int(snakemake.wildcards.clusters[:-1])
@@ -424,7 +434,7 @@ if __name__ == "__main__":
         clustering = clustering_for_n_clusters(n, n_clusters, custom_busmap, aggregate_carriers,
                                                line_length_factor, potential_mode,
                                                snakemake.config['solving']['solver']['name'],
-                                               "kmeans", hvac_overhead_cost, focus_weights,use_countries=False)
+                                               "kmeans", hvac_overhead_cost, focus_weights,use_countries=use_countries)
 
     update_p_nom_max(n)
 
