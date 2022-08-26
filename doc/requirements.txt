@@ -19,3 +19,8 @@ seaborn
 memory_profiler
 tables
 descartes
+
+
+alphashape
+libpysal
+spopt

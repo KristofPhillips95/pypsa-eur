@@ -129,9 +129,9 @@ def plot_map(n, ax=None, attribute='p_nom',opts={},alt_regions = None):
            ax=ax)
     ax.set_aspect('equal')
     ax.axis('off')
-    if isinstance(alt_regions,pd.DataFrame):
-        alt_regions.boundary[0]
-        alt_regions.plot()
+    # if isinstance(alt_regions,pd.DataFrame):
+    #     alt_regions.boundary[0]
+    #     alt_regions.plot()
 
 
 
@@ -255,7 +255,7 @@ def plot_total_cost_bar(n, ax=None):
     ax.grid(True, axis="y", color='k', linestyle='dotted')
 
 def load_renewable_zones():
-    return gpd.read_file("..//resources//renewable_shapes.geojson")
+    return gpd.read_file(f"..//resources//renewable_shapes_{snakemake.wildcards.regions}.geojson")
 
 if __name__ == "__main__":
     if 'snakemake' not in globals():
@@ -267,8 +267,8 @@ if __name__ == "__main__":
     opts = snakemake.config["plotting"]
     set_plot_style()
 
-    if snakemake.wildcards.regions == 'a':
-        alt_regions = load_renewable_zones()
+    # if snakemake.wildcards.regions.startswith('a'):
+    #     alt_regions = load_renewable_zones()
     config, wildcards = snakemake.config, snakemake.wildcards
 
     map_figsize = config["plotting"]['map']['figsize']
@@ -279,7 +279,7 @@ if __name__ == "__main__":
     scenario_opts = wildcards.opts.split('-')
 
     fig, ax = plt.subplots(figsize=map_figsize, subplot_kw={"projection": ccrs.PlateCarree()})
-    plot_map(n, ax, wildcards.attr,config['plotting'],alt_regions=alt_regions)
+    plot_map(n, ax, wildcards.attr,config['plotting'])
     plt.show()
     fig.savefig(snakemake.output.only_map, dpi=150, bbox_inches='tight')
 

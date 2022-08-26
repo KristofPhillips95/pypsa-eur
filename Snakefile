@@ -20,7 +20,7 @@ ATLITE_NPROCESSES = config['atlite'].get('nprocesses', 4)
 wildcard_constraints:
     simpl="[a-zA-Z0-9]*|all",
     clusters="[0-9]+m?|all",
-    regions = "[ac]+[0-9]*?",
+    regions = "[ac][0-9]*",
     ll="(v|c)([0-9\.]+|opt|all)|all",
     opts="[-+a-zA-Z0-9\.]*"
 #TODO Check regions constraint to be either c(countries) or a (alternative)
@@ -135,13 +135,13 @@ rule build_shapes:
     script: "scripts/build_shapes.py"
 
 rule build_renewable_shapes:
-    input:
-        country_shapes='resources/country_shapes.geojson',
-        offshore_shapes='resources/offshore_shapes.geojson'
+    input: 
+        cutout_solar = "cutouts/" + config["renewable"]['solar']['cutout'] + ".nc",
+        cutout_wind = "cutouts/" + config["renewable"]['onwind']['cutout'] + ".nc"
     output:
-        renewable_shapes = 'resources/renewable_shapes.geojson'
-    log: "logs/build_renewable_shapes.log"
-    threads: 1
+        renewable_shapes = 'resources/renewable_shapes_{regions}.geojson'
+    log: "logs/build_renewable_shapes_{regions}.log"
+    threads: 4
     resources: mem_mb=500
     script: "scripts/build_renewable_shapes.py"
 
