@@ -20,7 +20,7 @@ ATLITE_NPROCESSES = config['atlite'].get('nprocesses', 4)
 wildcard_constraints:
     simpl="[a-zA-Z0-9]*|all",
     clusters="[0-9]+m?|all",
-    regions = "[ac][0-9]*",
+    regions = "[wsc]*[-]*[0-9]*",
     ll="(v|c)([0-9\.]+|opt|all)|all",
     opts="[-+a-zA-Z0-9\.]*"
 #TODO Check regions constraint to be either c(countries) or a (alternative)
@@ -35,12 +35,17 @@ rule extra_components_all_networks:
 
 
 rule prepare_all_networks:
-    input: expand("networks/elec_s{simpl}_{clusters}_ec_l{ll}_{opts}.nc", **config['scenario'])
+    input: expand("networks/elec_s{simpl}_{clusters}_{regions}_ec_l{ll}_{opts}.nc", **config['scenario'])
 
 
 rule solve_all_networks:
-    input: expand("results/networks/elec_s{simpl}_{clusters}_ec_l{ll}_{opts}.nc", **config['scenario'])
+    input: expand("results/networks/elec_s{simpl}_{clusters}_{regions}_ec_l{ll}_{opts}.nc", **config['scenario'])
 
+rule make_all_summaries:
+    input: expand("results/summaries/elec_s{simpl}_{clusters}_{regions}_ec_l{ll}_{opts}_all", **config['scenario'])
+
+rule plot_all_networks:
+    input: expand("results/plots/elec_s{simpl}_{clusters}_{regions}_ec_l{ll}_{opts}_p_nom.png", **config['scenario'])
 
 if config['enable'].get('prepare_links_p_nom', False):
     rule prepare_links_p_nom:
@@ -135,7 +140,7 @@ rule build_shapes:
     script: "scripts/build_shapes.py"
 
 rule build_renewable_shapes:
-    input: 
+    input:
         cutout_solar = "cutouts/" + config["renewable"]['solar']['cutout'] + ".nc",
         cutout_wind = "cutouts/" + config["renewable"]['onwind']['cutout'] + ".nc"
     output:
@@ -287,8 +292,8 @@ rule simplify_network:
 rule cluster_network:
     input:
         network='networks/elec_s{simpl}_{regions}.nc',
-        regions_onshore="resources/regions_onshore_elec_s{simpl}.geojson",
-        regions_offshore="resources/regions_offshore_elec_s{simpl}.geojson",
+        regions_onshore="resources/regions_onshore_elec_s{simpl}_{regions}.geojson",
+        regions_offshore="resources/regions_offshore_elec_s{simpl}_{regions}.geojson",
         busmap=ancient('resources/busmap_elec_s{simpl}_{regions}.csv'),
         custom_busmap=("data/custom_busmap_elec_s{simpl}_{clusters}.csv"
                        if config["enable"].get("custom_busmap", False) else []),

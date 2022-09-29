@@ -195,7 +195,7 @@ if __name__ == "__main__":
                                   simpl='', clusters=37,regions = 'c')
     configure_logging(snakemake)
 
-    if snakemake.wildcards.regions.startswith('a'):
+    if snakemake.wildcards.regions.startswith('s') or snakemake.wildcards.regions.startswith('w'):
         use_countries = False
     elif snakemake.wildcards.regions == 'c':
         use_countries = True

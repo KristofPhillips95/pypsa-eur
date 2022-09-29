@@ -1,0 +1,8 @@
+#!/bin/bash
+# Basic while loop
+
+for res in [ 37 45 64 ]
+d
+snakemake -c1 results/plots/elec_s_$(res)_a_ec_lcopt_Co2L-24H_p_nom.png
+done
+echo All done

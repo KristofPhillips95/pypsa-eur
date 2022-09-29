@@ -134,7 +134,7 @@ def plot_regions_scatter_and_save(lat_all, lon_all, ds,attributes,nb_regions):
 
     colors = [model.centroids_[label, 0] for label in model.labels_]
     axs[0].scatter(lon_all_gran, lat_all_gran, c=colors)
-    axs[0].set_title('K-means clusters')
+    axs[0].set_title(f'K-means clusters {attributes}')
 
     for attr_idx in range(len(attributes)):
 
@@ -144,7 +144,8 @@ def plot_regions_scatter_and_save(lat_all, lon_all, ds,attributes,nb_regions):
 
 
     fig.suptitle(f'Clustering {attributes[attr_idx]} {nb_regions}')
-    path = os.path.join(snakemake.output.renewable_shapes.partition("resources")[0], "results", "plots" , f"renewable_clusters_scatter{attributes}_{nb_regions}")
+    path = os.path.join(snakemake.output.renewable_shapes.partition("resources")[0], "results", "plots" , f"renewable_clusters_scatter_{attributes}_{nb_regions}")
+    print(path)
     plt.savefig(path)
 
 
@@ -157,10 +158,15 @@ def create_geodataframe_with_shapes_from_k_means_model(lat_all_gran,lon_all_gran
         idx = (model.labels_ == cluster)
         polygons = mini_shapes_attr_gran[idx]
         cluster_shape = shapely.ops.unary_union(polygons)
-        center_1 = model.centroids_[cluster][0]
-        center_2 = model.centroids_[cluster][1]
+
+
         frame_row = geopandas.GeoDataFrame(
-            {"name": [f"Ren_{cluster}"], "geometry": cluster_shape, "center_1": center_1, "center_2": center_2})
+            {"name": [f"Ren_{cluster}"], "geometry": cluster_shape})
+        i=0
+        for center in model.centroids_[cluster]:
+            i+=1
+            frame_row[f"center{i}"]= center
+
         clusters = clusters.append(frame_row)
     return clusters
 
@@ -168,9 +174,9 @@ def create_geodataframe_with_shapes_from_k_means_model(lat_all_gran,lon_all_gran
 if __name__ == "__main__":
     if 'snakemake' not in globals():
         from _helpers import mock_snakemake
-        snakemake = mock_snakemake('build_renewable_shapes',regions = 'a5')
+        snakemake = mock_snakemake('build_renewable_shapes',regions = 's-5')
     configure_logging(snakemake)
-    save_fig = True
+    save_fig = snakemake.config["renewable_zones"]["save_fig"]
 
     #Load datasets of era and sara into dict
     ds = dict()
@@ -179,7 +185,13 @@ if __name__ == "__main__":
 
     #Extract main parameters of clustering method from config file and wildcard
     gran = snakemake.config["renewable_zones"]["granularity"]
-    nb_regions = int(snakemake.wildcards.regions.partition("a")[2])
+    attr_wc = snakemake.wildcards.regions.partition("-")[0]
+    print(attr_wc)
+    print(snakemake.wildcards.regions.partition("-")[2])
+    if snakemake.wildcards.regions == "c":
+        nb_regions = 1
+    else:
+        nb_regions = int(snakemake.wildcards.regions.partition("-")[2])
 
     #Name of the relevant data in datasets
     name = {'w': 'wnd100m', 's': 'influx_direct'}
@@ -201,10 +213,15 @@ if __name__ == "__main__":
     lon_all_gran = np.repeat(l1, len(l2))
 
     #Create the actual regional k-means model to be solved
-    model = generate_regional_kmeans_model(l1,l2,[at_1, at_2],nb_regions)
+    if attr_wc == 'ws':
+        model = generate_regional_kmeans_model(l1,l2,[at_1, at_2],nb_regions)
+    elif attr_wc  == 'w':
+        model = generate_regional_kmeans_model(l1,l2,[at_1],nb_regions)
+    elif attr_wc == 's':
+        model = generate_regional_kmeans_model(l1,l2,[at_2],nb_regions)
 
     #And solve it. Seed is given for reproducibility
-    np.random.seed(0)
+    np.random.seed(snakemake.config["renewable_zones"]["seed"])
     model.solve()
 
     #Generate shapes from the datapoints' locations and cluster labels from the model solve
@@ -219,4 +236,4 @@ if __name__ == "__main__":
             lat_all[attr] = np.tile(lat[attr],len(lon[attr]))
             lon_all[attr] = np.repeat(lon[attr], len(lat[attr]))
 
-        plot_regions_scatter_and_save(lat_all, lon_all, ds, [attr for attr in ds] , nb_regions)
+        plot_regions_scatter_and_save(lat_all, lon_all, ds, attr_wc , nb_regions)

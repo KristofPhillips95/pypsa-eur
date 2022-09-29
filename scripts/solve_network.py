@@ -82,6 +82,7 @@ from _helpers import configure_logging
 import numpy as np
 import pandas as pd
 import re
+import os
 
 import pypsa
 from pypsa.linopf import (get_var, define_constraints, linexpr, join_exprs,
@@ -244,6 +245,12 @@ def extra_functionality(n, snapshots):
 
 def solve_network(n, config, opts='', **kwargs):
     solver_options = config['solving']['solver'].copy()
+    if solver_options["ResultFile"]:
+        output_dir = os.path.join(os.path.abspath(os.path.dirname(os.path.dirname(__file__))) ,"test.ilp")
+        solver_options["ResultFile"] = output_dir
+        print(output_dir)
+    else:
+        del solver_options["ResultFile"]
     solver_name = solver_options.pop('name')
     cf_solving = config['solving']['options']
     track_iterations = cf_solving.get('track_iterations', False)

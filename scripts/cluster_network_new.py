@@ -384,9 +384,9 @@ if __name__ == "__main__":
     if snakemake.wildcards.regions == 'c':
         use_countries = True
         print("Using default countries as supraclustering regions")
-    elif snakemake.wildcards.regions.startswith('a'):
+    elif snakemake.wildcards.regions.startswith('s') or snakemake.wildcards.regions.startswith('w') :
         use_countries = False
-        print("Using ren_zone as supraclustering regions")
+        print("Using ren_zones as supraclustering regions")
     else:
         raise Exception(f"Regions must be either 'a+number' or  'c', currently {snakemake.wildcards.regions}")
 
