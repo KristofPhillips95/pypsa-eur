@@ -190,50 +190,53 @@ if __name__ == "__main__":
     print(snakemake.wildcards.regions.partition("-")[2])
     if snakemake.wildcards.regions == "c":
         nb_regions = 1
+        clusters = gpd.read_file(snakemake.input.country_shapes)
     else:
         nb_regions = int(snakemake.wildcards.regions.partition("-")[2])
 
-    #Name of the relevant data in datasets
-    name = {'w': 'wnd100m', 's': 'influx_direct'}
-    attr_1 = 'w'
-    attr_2 = 's'
+        #Name of the relevant data in datasets
+        name = {'w': 'wnd100m', 's': 'influx_direct'}
+        attr_1 = 'w'
+        attr_2 = 's'
 
-    #Get latitudes and longitudes from the dataset
-    lat,lon = get_lons_lats_from_ds(ds)
-    #And select the ones that occur in both datasets
-    sel_lat, sel_lon = intersect_lats_lons(lat,lon)
+        #Get latitudes and longitudes from the dataset
+        lat,lon = get_lons_lats_from_ds(ds)
+        #And select the ones that occur in both datasets
+        sel_lat, sel_lon = intersect_lats_lons(lat,lon)
 
-    #Change the granularity to the desired resolution. This is done for computational feasibility
-    l1, l2, at_1, pu = change_granularity(np.mean(ds[attr_1][name[attr_1]][:, :, :].data[:, sel_lat, :],
-                                                  axis=0), lat[attr_1][sel_lat], lon[attr_1], gran)
-    l1, l2, at_2, pu = change_granularity(np.mean(ds[attr_2][name[attr_2]][:, :, :].data[:, :, sel_lon],
-                                                  axis=0), lat[attr_2], lon[attr_2][sel_lon], gran)
-    #Vector of repeated lats and lons
-    lat_all_gran = np.tile(l2, len(l1))
-    lon_all_gran = np.repeat(l1, len(l2))
+        #Change the granularity to the desired resolution. This is done for computational feasibility
+        l1, l2, at_1, pu = change_granularity(np.mean(ds[attr_1][name[attr_1]][:, :, :].data[:, sel_lat, :],
+                                                      axis=0), lat[attr_1][sel_lat], lon[attr_1], gran)
+        l1, l2, at_2, pu = change_granularity(np.mean(ds[attr_2][name[attr_2]][:, :, :].data[:, :, sel_lon],
+                                                      axis=0), lat[attr_2], lon[attr_2][sel_lon], gran)
+        #Vector of repeated lats and lons
+        lat_all_gran = np.tile(l2, len(l1))
+        lon_all_gran = np.repeat(l1, len(l2))
 
-    #Create the actual regional k-means model to be solved
-    if attr_wc == 'ws':
-        model = generate_regional_kmeans_model(l1,l2,[at_1, at_2],nb_regions)
-    elif attr_wc  == 'w':
-        model = generate_regional_kmeans_model(l1,l2,[at_1],nb_regions)
-    elif attr_wc == 's':
-        model = generate_regional_kmeans_model(l1,l2,[at_2],nb_regions)
+        #Create the actual regional k-means model to be solved
+        if attr_wc == 'ws':
+            model = generate_regional_kmeans_model(l1,l2,[at_1, at_2],nb_regions)
+        elif attr_wc  == 'w':
+            model = generate_regional_kmeans_model(l1,l2,[at_1],nb_regions)
+        elif attr_wc == 's':
+            model = generate_regional_kmeans_model(l1,l2,[at_2],nb_regions)
 
-    #And solve it. Seed is given for reproducibility
-    np.random.seed(snakemake.config["renewable_zones"]["seed"])
-    model.solve()
+        #And solve it. Seed is given for reproducibility
+        np.random.seed(snakemake.config["renewable_zones"]["seed"])
+        model.solve()
 
-    #Generate shapes from the datapoints' locations and cluster labels from the model solve
-    clusters = create_geodataframe_with_shapes_from_k_means_model(lat_all_gran,lon_all_gran,model)
+        #Generate shapes from the datapoints' locations and cluster labels from the model solve
+        clusters = create_geodataframe_with_shapes_from_k_means_model(lat_all_gran,lon_all_gran,model)
+
+        if save_fig:
+            lat_all = dict()
+            lon_all = dict()
+            for attr in ds:
+                lat_all[attr] = np.tile(lat[attr], len(lon[attr]))
+                lon_all[attr] = np.repeat(lon[attr], len(lat[attr]))
+
+            plot_regions_scatter_and_save(lat_all, lon_all, ds, attr_wc, nb_regions)
 
     save_to_geojson(clusters,snakemake.output.renewable_shapes)
 
-    if save_fig:
-        lat_all = dict()
-        lon_all = dict()
-        for attr in ds:
-            lat_all[attr] = np.tile(lat[attr],len(lon[attr]))
-            lon_all[attr] = np.repeat(lon[attr], len(lat[attr]))
 
-        plot_regions_scatter_and_save(lat_all, lon_all, ds, attr_wc , nb_regions)

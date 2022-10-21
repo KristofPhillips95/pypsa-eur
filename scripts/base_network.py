@@ -619,7 +619,7 @@ def base_network(eg_buses, eg_converters, eg_transformers, eg_lines, eg_links,
     _set_countries_and_substations(n, config, country_shapes, offshore_shapes)
 
     ##TODO Check if the alternative regions are used
-    _set_renewable_zone(n,snakemake.input.renewable_shapes,offshore_shapes)
+    #_set_renewable_zone(n,snakemake.input.renewable_shapes,offshore_shapes)
 
     _set_links_underwater_fraction(n, offshore_shapes)
 

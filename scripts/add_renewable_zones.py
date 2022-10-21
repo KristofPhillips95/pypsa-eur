@@ -19,7 +19,7 @@ def _set_renewable_zone(n, renewable_shapes, offshore_shapes):
         )
     ren_zones = gpd.read_file(renewable_shapes).name
     renewable_shapes = gpd.read_file(renewable_shapes).set_index('name')['geometry']
-    offshore_shapes = gpd.read_file(offshore_shapes).set_index('name')['geometry']
+    #offshore_shapes = gpd.read_file(offshore_shapes).set_index('name')['geometry']
 
     for ren_zone in ren_zones:
         ren_shape = renewable_shapes[ren_zone]

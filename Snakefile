@@ -98,6 +98,7 @@ rule build_powerplants:
     script: "scripts/build_powerplants.py"
 
 
+
 rule base_network:
     input:
         eg_buses='data/entsoegridkit/buses.csv',
@@ -110,14 +111,25 @@ rule base_network:
         links_tyndp='data/links_tyndp.csv',
         country_shapes='resources/country_shapes.geojson',
         offshore_shapes='resources/offshore_shapes.geojson',
-        renewable_shapes='resources/renewable_shapes_{regions}.geojson',
         europe_shape='resources/europe_shape.geojson'
+    output:  "networks/base.nc"
+    log: "logs/base_network.log"
+    benchmark: "benchmarks/base_network"
+    threads: 1
+    resources: mem_mb=500
+    script: "scripts/base_network.py"
+
+rule add_ren_zones:
+    input:
+       renewable_shapes='resources/renewable_shapes_{regions}.geojson',
+       base_network = "networks/base.nc"
     output: "networks/base_{regions}.nc"
+
     log: "logs/base_network_{regions}.log"
     benchmark: "benchmarks/base_network_{regions}"
     threads: 1
     resources: mem_mb=500
-    script: "scripts/base_network.py"
+    script: "scripts/add_renewable_zones.py"
 
 
 rule build_shapes:
@@ -141,6 +153,7 @@ rule build_shapes:
 
 rule build_renewable_shapes:
     input:
+        country_shapes='resources/country_shapes.geojson',
         cutout_solar = "cutouts/" + config["renewable"]['solar']['cutout'] + ".nc",
         cutout_wind = "cutouts/" + config["renewable"]['onwind']['cutout'] + ".nc"
     output:
