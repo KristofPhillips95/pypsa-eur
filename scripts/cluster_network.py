@@ -175,6 +175,10 @@ def weighting_for_country(n, x):
     return (w * (100.0 / w.max())).clip(lower=1.0).astype(int)
 
 
+
+
+
+
 def get_feature_for_hac(n, buses_i=None, feature=None):
     if buses_i is None:
         buses_i = n.buses.index
@@ -223,6 +227,10 @@ def distribute_clusters(n, n_clusters, focus_weights=None, solver_name="cbc"):
     Determine the number of clusters per country.
     """
 
+
+
+
+
     L = (
         n.loads_t.p_set.mean()
         .groupby(n.loads.bus)
@@ -233,10 +241,8 @@ def distribute_clusters(n, n_clusters, focus_weights=None, solver_name="cbc"):
     )
 
     N = n.buses.groupby(["country", "sub_network"]).size()
-
-    assert (
-        n_clusters >= len(N) and n_clusters <= N.sum()
-    ), f"Number of clusters must be {len(N)} <= n_clusters <= {N.sum()} for this selection of countries."
+    assert (n_clusters >= len(N) and n_clusters <= N.sum()),\
+        f"Number of clusters must be {len(N)} <= n_clusters <= {N.sum()} for this selection of countries."
 
     if focus_weights is not None:
 
@@ -376,6 +382,7 @@ def busmap_for_n_clusters(
                 f"`algorithm` must be one of 'kmeans' or 'hac'. Is {algorithm}."
             )
 
+
     return (
         n.buses.groupby(["country", "sub_network"], group_keys=False)
         .apply(busmap_for_country)
@@ -406,6 +413,8 @@ def clustering_for_n_clusters(
         busmap = busmap_for_n_clusters(
             n, n_clusters, solver_name, focus_weights, algorithm, feature
         )
+
+
     else:
         busmap = custom_busmap
 
@@ -474,6 +483,15 @@ if __name__ == "__main__":
             if tech in snakemake.config["renewable"]
         ]
     )
+
+
+
+
+
+
+
+
+
 
     exclude_carriers = snakemake.config["clustering"]["cluster_network"].get(
         "exclude_carriers", []

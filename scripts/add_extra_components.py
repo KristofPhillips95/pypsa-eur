@@ -99,14 +99,16 @@ def attach_storageunits(n, costs, elec_opts):
         )
 
 
-def attach_stores(n, costs, elec_opts):
+def attach_stores(n, costs, elec_opts,use_countries = True):
     carriers = elec_opts["extendable_carriers"]["Store"]
 
     _add_missing_carriers_from_costs(n, costs, carriers)
 
     buses_i = n.buses.index
-    bus_sub_dict = {k: n.buses[k].values for k in ["x", "y", "country"]}
-
+    if use_countries:
+        bus_sub_dict = {k: n.buses[k].values for k in ['x', 'y', 'country']}
+    else:
+        bus_sub_dict = {k: n.buses[k].values for k in ['x', 'y', 'ren_zone']}
     if "H2" in carriers:
         h2_buses_i = n.madd("Bus", buses_i + " H2", carrier="H2", **bus_sub_dict)
 
@@ -231,7 +233,7 @@ if __name__ == "__main__":
     if "snakemake" not in globals():
         from _helpers import mock_snakemake
         snakemake = mock_snakemake('add_extra_components', network='elec',
-                                  simpl='', clusters=37,regions = 'c')
+                                  simpl='', clusters=37,regions = 's-5')
     configure_logging(snakemake)
 
     if snakemake.wildcards.regions.startswith('s') or snakemake.wildcards.regions.startswith('w'):

@@ -264,7 +264,7 @@ def progress_retrieve(url, file):
     urllib.request.urlretrieve(url, file, reporthook=dlProgress)
 
 
-def get_aggregation_strategies(aggregation_strategies):
+def get_aggregation_strategies(aggregation_strategies,use_countries=True):
     # default aggregation strategies that cannot be defined in .yaml format must be specified within
     # the function, otherwise (when defaults are passed in the function's definition) they get lost
     # when custom values are specified in the config.
@@ -272,8 +272,12 @@ def get_aggregation_strategies(aggregation_strategies):
     import numpy as np
     from pypsa.networkclustering import _make_consense
 
-    bus_strategies = dict(country=_make_consense("Bus", "country"))
-    bus_strategies.update(aggregation_strategies.get("buses", {}))
+    if use_countries:
+        bus_strategies = dict(country=_make_consense("Bus", "country"))
+        bus_strategies.update(aggregation_strategies.get("buses", {}))
+    else:
+        bus_strategies = dict(ren_zone=_make_consense("Bus", "Ren_zone"))
+        bus_strategies.update(aggregation_strategies.get("buses", {}))
 
     generator_strategies = {"build_year": lambda x: 0, "lifetime": lambda x: np.inf}
     generator_strategies.update(aggregation_strategies.get("generators", {}))

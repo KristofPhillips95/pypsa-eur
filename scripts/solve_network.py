@@ -423,7 +423,7 @@ if __name__ == "__main__":
         snakemake = mock_snakemake('solve_network', network='elec', simpl='',
                                   clusters='37',regions="s-5", ll='copt', opts='Co2L-3H')
     configure_logging(snakemake)
-
+    print("In the script!")
     tmpdir = snakemake.config["solving"].get("tmpdir")
     if tmpdir is not None:
         Path(tmpdir).mkdir(parents=True, exist_ok=True)
@@ -432,6 +432,7 @@ if __name__ == "__main__":
 
     fn = getattr(snakemake.log, "memory", None)
     with memory_logger(filename=fn, interval=30.0) as mem:
+        print("In the solving part!")
         n = pypsa.Network(snakemake.input[0])
         n = prepare_network(n, solve_opts)
         n = solve_network(
@@ -441,7 +442,10 @@ if __name__ == "__main__":
             solver_dir=tmpdir,
             solver_logfile=snakemake.log.solver,
         )
+        print("Network solved")
         n.meta = dict(snakemake.config, **dict(wildcards=dict(snakemake.wildcards)))
+        print("Exporting solved network")
         n.export_to_netcdf(snakemake.output[0])
+        print(f"Exported solved network to{snakemake.output[0]}")
 
     logger.info("Maximum memory usage: {}".format(mem.mem_usage))

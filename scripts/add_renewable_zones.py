@@ -50,7 +50,8 @@ def find_renewable_zone(zones,bus):
 if __name__ == "__main__":
     if 'snakemake' not in globals():
         from _helpers import mock_snakemake
-        snakemake = mock_snakemake('add_renewable_zones')
+
+        snakemake = mock_snakemake('add_ren_zones', regions="s-5")
     configure_logging(snakemake)
 
     n = pypsa.Network(snakemake.input.base_network)
