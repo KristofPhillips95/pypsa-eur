@@ -7,10 +7,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 import alphashape
 import geopandas as gpd
-import geopandas
 import libpysal
 from spopt.region import RegionKMeansHeuristic
 import shapely
+import pandas as pd
 
 
 def save_to_geojson(df, fn):
@@ -46,6 +46,43 @@ def mini_shapes(lat_all, lon_all, coords=False):
 
     return shapes
 
+def get_rescaled_lats_and_lons(lats,lons,sel_lat,sel_lon,new_sz,attr_wc):
+
+    def check_gran_larger_than_size(lats_,lons_,new_sz):
+        sz_lat = round(max(lats_[1:] - lats_[0:-1]), 5)
+        sz_lon = round(max(lons_[1:] - lons_[0:-1]), 5)
+        assert round(sz_lat, 5) == round(sz_lon, 5) <= new_sz
+
+
+
+    if len(attr_wc) ==1:
+        lats_ = np.round(lats[attr_wc][sel_lat[attr_wc]], 5)
+        lons_ = np.round(lons[attr_wc][sel_lon[attr_wc]], 5)
+        check_gran_larger_than_size(lats_,lons_,new_sz)
+        new_lats = [l for l in np.arange(min(lats_) + new_sz / 2, max(lats_) - new_sz / 2, new_sz)]
+        new_lons = [l for l in np.arange(min(lons_) + new_sz / 2, max(lons_) - new_sz / 2, new_sz)]
+
+    elif len(attr_wc)==2:
+        min_lat,max_lat,min_lon,max_lon = -180,180,-180,180
+        lats_,lons_ = dict(),dict()
+        for at in attr_wc:
+            lats_[at] = np.round(lats[at][sel_lat[at]], 5)
+            lons_[at] = np.round(lons[at][sel_lon[at]], 5)
+
+            min_lat = max(min_lat,min(lats_[at]))
+            max_lat = min(max_lat, max(lats_[at]))
+
+            min_lon = max(min_lon,min(lons_[at]))
+            max_lon = min(max_lon, max(lons_[at]))
+
+            check_gran_larger_than_size(lats_[at],lons_[at],new_sz)
+
+        new_lats = [l for l in np.arange(min_lat + new_sz / 2, max_lat - new_sz / 2, new_sz)]
+        new_lons = [l for l in np.arange(min_lon + new_sz / 2, max_lon - new_sz / 2, new_sz)]
+
+
+
+    return new_lats,new_lons
 
 def change_granularity(attr, lats, lons, new_sz):
     ##To avoid numerical problems, let's first round the original coordinates
@@ -87,6 +124,38 @@ def change_granularity(attr, lats, lons, new_sz):
     return new_lons, new_lats, attr_new, pointsused
 
 
+def change_data_granularity(attr,lats,lons, new_lats, new_lons, new_sz):
+
+    pointsused = 0
+
+    assert attr.shape == (len(lats), len(lons))
+
+
+
+    attr_new = np.zeros((len(new_lats), len(new_lons)))
+
+    for new_lat in new_lats:
+        # Let's start by getting all the indices of old latitudes that that are now linked to this new lat.
+        # Assumption of symmetry around new lat
+        lat_range = (new_lat - new_sz / 2, new_lat + new_sz / 2)
+
+        indices_in_a = np.where(np.logical_and(lats >= lat_range[0], lats < lat_range[1]))[0]
+        # indices_border_a = np.where(np.logical_and(lats==lat_range[0], lats==lat_range[1]))
+
+        for new_lon in new_lons:
+            lon_range = (new_lon - new_sz / 2, new_lon + new_sz / 2)
+
+            indices_in_o = np.where(np.logical_and(lons >= lon_range[0], lons < lon_range[1]))[0]
+            # indices_border_o = np.where(np.logical_and(lons==lon_range[0], lons==lon_range[1]))
+
+            list_points_in = [attr[x, y] for x in indices_in_a for y in indices_in_o]
+            new_value = np.mean(list_points_in)
+            pointsused += len(list_points_in)
+            attr_new[np.where(new_lats == new_lat)[0], np.where(new_lons == new_lon)[0]] = new_value
+
+    return attr_new, pointsused
+
+
 def get_lons_lats_from_ds(ds):
     lat = dict()
     lon = dict()
@@ -104,11 +173,25 @@ def get_lons_lats_from_ds(ds):
 
 ##TODO this implementation leans on the assumption that attr 1 has the highest lat range, and attr 2 has highest lon range
 def intersect_lats_lons(lat, lon):
-    b_lat = min(max(lat['s'][:]), max(lat['w'][:]))
-    b_lon = min(max(lon['s'][:]), max(lon['w'][:]))
+    b_lat = min(max(lat['s'][:]), max(lat['w'][:]),np.float64(65.))
+    b_lon = min(max(lon['s'][:]), max(lon['w'][:]),np.float64(35.))
+
+    #b_lat = np.float64(65.)
+    #b_lon = np.float64(35.)
+
 
     sel_lat = lat[attr_1] <= b_lat
     sel_lon = lon[attr_2] <= b_lon
+
+    sel_lat = dict()
+    sel_lon = dict()
+
+    sel_lat["s"] = lat["s"] <= b_lat
+    sel_lon["s"] = lon["s"] <= b_lon
+
+    sel_lat["w"] = lat["w"] <= b_lat
+    sel_lon["w"] = lon["w"] <= b_lon
+
 
     return sel_lat,sel_lon
 
@@ -144,6 +227,9 @@ def plot_regions_scatter_and_save(lat_all, lon_all, ds,attributes,nb_regions):
 
 
     fig.suptitle(f'Clustering {attributes[attr_idx]} {nb_regions}')
+    dir_path = os.path.join(snakemake.output.renewable_shapes.partition("resources")[0], "results", "plots")
+    if not(os.path.exists(dir_path)):
+        os.makedirs(dir_path)
     path = os.path.join(snakemake.output.renewable_shapes.partition("resources")[0], "results", "plots" , f"renewable_clusters_scatter_{attributes}_{nb_regions}")
     print(path)
     plt.savefig(path)
@@ -167,14 +253,15 @@ def create_geodataframe_with_shapes_from_k_means_model(lat_all_gran,lon_all_gran
             i+=1
             frame_row[f"center{i}"]= center
 
-        clusters = clusters.append(frame_row)
+        #clusters = clusters.append(frame_row)
+        clusters = pd.concat([clusters, frame_row], axis=0, ignore_index=True)
     return clusters
 
 
 if __name__ == "__main__":
     if 'snakemake' not in globals():
         from _helpers import mock_snakemake
-        snakemake = mock_snakemake('build_renewable_shapes',regions = 's-5')
+        snakemake = mock_snakemake('build_renewable_shapes',regions = 'ws-5')
     configure_logging(snakemake)
     save_fig = snakemake.config["renewable_zones"]["save_fig"]
 
@@ -188,6 +275,7 @@ if __name__ == "__main__":
     attr_wc = snakemake.wildcards.regions.partition("-")[0]
     print(attr_wc)
     print(snakemake.wildcards.regions.partition("-")[2])
+
     if snakemake.wildcards.regions == "c":
         nb_regions = 1
         clusters = gpd.read_file(snakemake.input.country_shapes)
@@ -204,11 +292,20 @@ if __name__ == "__main__":
         #And select the ones that occur in both datasets
         sel_lat, sel_lon = intersect_lats_lons(lat,lon)
 
+        l1,l2 = get_rescaled_lats_and_lons(lat,lon,sel_lat,sel_lon,gran,attr_wc)
+
         #Change the granularity to the desired resolution. This is done for computational feasibility
-        l1, l2, at_1, pu = change_granularity(np.mean(ds[attr_1][name[attr_1]][:, :, :].data[:, sel_lat, :],
-                                                      axis=0), lat[attr_1][sel_lat], lon[attr_1], gran)
-        l1, l2, at_2, pu = change_granularity(np.mean(ds[attr_2][name[attr_2]][:, :, :].data[:, :, sel_lon],
-                                                      axis=0), lat[attr_2], lon[attr_2][sel_lon], gran)
+        # l1, l2, at_1, pu = change_granularity(np.mean(ds[attr_1][name[attr_1]][:, :, :].data[:,sel_lat[attr_1],:][:,:,sel_lon[attr_1]],
+        #                                               axis=0), lat[attr_1][sel_lat[attr_1]], lon[attr_1][sel_lon[attr_1]], gran)
+        # l1, l2, at_2, pu = change_granularity(np.mean(ds[attr_2][name[attr_2]][:, :, :].data[:, sel_lat[attr_2],:][:,:,sel_lon[attr_2]],
+        #                                               axis=0), lat[attr_2][sel_lat[attr_2]], lon[attr_2][sel_lon[attr_2]], gran)
+        at_1, pu = change_data_granularity(
+            np.mean(ds[attr_1][name[attr_1]][:, :, :].data[:, sel_lat[attr_1], :][:, :, sel_lon[attr_1]],
+                    axis=0), lat[attr_1][sel_lat[attr_1]], lon[attr_1][sel_lon[attr_1]], l1, l2, gran)
+        at_2, pu = change_data_granularity(
+            np.mean(ds[attr_2][name[attr_2]][:, :, :].data[:, sel_lat[attr_2], :][:, :, sel_lon[attr_2]],
+                    axis=0), lat[attr_2][sel_lat[attr_2]], lon[attr_2][sel_lon[attr_2]], l1,l2, gran)
+
         #Vector of repeated lats and lons
         lat_all_gran = np.tile(l2, len(l1))
         lon_all_gran = np.repeat(l1, len(l2))

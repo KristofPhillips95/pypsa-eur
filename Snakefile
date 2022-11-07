@@ -47,7 +47,7 @@ rule extra_components_all_networks:
 
 rule prepare_all_networks:
     input:
-        expand(
+        expand("networks/elec_s{simpl}_{clusters}_{regions}_ec_l{ll}_{opts}.nc",
             **config["scenario"]
         ),
 
@@ -55,7 +55,7 @@ rule prepare_all_networks:
 rule solve_all_networks:
     input:
         expand(
-            "results/networks/" + RDIR + "elec_s{simpl}_{clusters}_ec_l{ll}_{opts}.nc",
+            "results/networks/" + RDIR + "elec_s{simpl}_{clusters}_{regions}_ec_l{ll}_{opts}.nc",
             **config["scenario"]
         ),
 
@@ -177,9 +177,9 @@ rule base_network:
 
 rule add_ren_zones:
     input:
-       renewable_shapes='resources/renewable_shapes_{regions}.geojson',
-       base_network = "networks/base.nc"
-    output: "networks/base_{regions}.nc"
+       renewable_shapes='resources/' +RDIR+ 'renewable_shapes_{regions}.geojson',
+       base_network = "networks/" +RDIR+ "base.nc"
+    output: "networks/" + RDIR + "base_{regions}.nc"
 
     log: "logs/base_network_{regions}.log"
     benchmark: "benchmarks/base_network_{regions}"
@@ -212,11 +212,11 @@ rule build_shapes:
 
 rule build_renewable_shapes:
     input:
-        country_shapes='resources/country_shapes.geojson',
+        country_shapes="resources/" + RDIR + "country_shapes.geojson",
         cutout_solar = "cutouts/" + config["renewable"]['solar']['cutout'] + ".nc",
         cutout_wind = "cutouts/" + config["renewable"]['onwind']['cutout'] + ".nc"
     output:
-        renewable_shapes = 'resources/renewable_shapes_{regions}.geojson'
+        renewable_shapes = 'resources/' +RDIR+ 'renewable_shapes_{regions}.geojson'
     log: "logs/build_renewable_shapes_{regions}.log"
     threads: 4
     resources: mem_mb=500
@@ -438,7 +438,7 @@ rule build_hydro_profile:
 
 rule add_electricity:
     input:
-        base_network="networks/" + RDIR + "base{region}.nc",
+        base_network="networks/" + RDIR + "base_{regions}.nc",
         **{
             f"profile_{tech}": "resources/" + RDIR + f"profile_{tech}.nc"
             for tech in config["renewable"]
@@ -449,7 +449,6 @@ rule add_electricity:
             for attr, fn in d.items()
             if str(fn).startswith("data/")
         },
-        base_network="networks/" + RDIR + "base{regions}.nc",
         tech_costs=COSTS,
         regions="resources/" + RDIR + "regions_onshore.geojson",
         powerplants="resources/" + RDIR + "powerplants.csv",
@@ -497,7 +496,7 @@ rule cluster_network:
     input:
         network="networks/" + RDIR + "elec_s{simpl}_{regions}.nc",
         regions_onshore="resources/" + RDIR + "regions_onshore_elec_s{simpl}_{regions}.geojson",
-        regions_offshore="resources/" + RDIR + "regions_offshore_elec_s{simpl_{regions}}.geojson",
+        regions_offshore="resources/" + RDIR + "regions_offshore_elec_s{simpl}_{regions}.geojson",
         busmap=ancient("resources/" + RDIR + "busmap_elec_s{simpl}_{regions}.csv"),
         custom_busmap=(
             "data/custom_busmap_elec_s{simpl}_{clusters}.csv"
@@ -523,7 +522,7 @@ rule cluster_network:
     resources:
         mem_mb=6000,
     script:
-        "scripts/cluster_network.py"
+        "scripts/cluster_network_new_2.py"
 
 
 rule add_extra_components:
@@ -582,13 +581,13 @@ def memory(w):
         return int(factor * (18000 + 180 * 4000))
     else:
         return int(factor * (10000 + 195 * int(w.clusters)))
+
 rule solve_network:
-
-
     input:
         "networks/" + RDIR + "elec_s{simpl}_{clusters}_{regions}_ec_l{ll}_{opts}.nc",
     output:
         "results/networks/" + RDIR + "elec_s{simpl}_{clusters}_{regions}_ec_l{ll}_{opts}.nc",
+    log:
         solver=normpath(
             "logs/"
             + RDIR
@@ -602,6 +601,8 @@ rule solve_network:
         + "solve_network/elec_s{simpl}_{clusters}_{regions}_ec_l{ll}_{opts}_memory.log",
     benchmark:
         "benchmarks/" + RDIR + "solve_network/elec_s{simpl}_{clusters}_{regions}_ec_l{ll}_{opts}"
+    script:
+        "scripts/solve_network.py"
 
 rule solve_operations_network:
     input:
