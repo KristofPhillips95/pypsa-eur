@@ -170,7 +170,6 @@ def get_lons_lats_from_ds(ds):
     return lat, lon
 
 
-
 ##TODO this implementation leans on the assumption that attr 1 has the highest lat range, and attr 2 has highest lon range
 def intersect_lats_lons(lat, lon):
     b_lat = min(max(lat['s'][:]), max(lat['w'][:]),np.float64(65.))
@@ -199,7 +198,7 @@ def intersect_lats_lons(lat, lon):
 def generate_regional_kmeans_model(l1, l2, attributes,nb_regions):
 
 
-    w_gran = libpysal.weights.lat2W(len(l1), len(l2))
+    w_gran = libpysal.weights.lat2W(len(l2), len(l1))
 
     data = np.zeros(shape=(len(lon_all_gran), len(attributes)))
 
@@ -236,7 +235,7 @@ def plot_regions_scatter_and_save(lat_all, lon_all, ds,attributes,nb_regions):
 
 
 def create_geodataframe_with_shapes_from_k_means_model(lat_all_gran,lon_all_gran,model):
-    clusters = geopandas.GeoDataFrame()
+    clusters = gpd.GeoDataFrame()
 
     mini_shapes_attr_gran = np.array(mini_shapes(lat_all_gran, lon_all_gran))
 
@@ -245,8 +244,7 @@ def create_geodataframe_with_shapes_from_k_means_model(lat_all_gran,lon_all_gran
         polygons = mini_shapes_attr_gran[idx]
         cluster_shape = shapely.ops.unary_union(polygons)
 
-
-        frame_row = geopandas.GeoDataFrame(
+        frame_row = gpd.GeoDataFrame(
             {"name": [f"Ren_{cluster}"], "geometry": cluster_shape})
         i=0
         for center in model.centroids_[cluster]:
@@ -261,7 +259,7 @@ def create_geodataframe_with_shapes_from_k_means_model(lat_all_gran,lon_all_gran
 if __name__ == "__main__":
     if 'snakemake' not in globals():
         from _helpers import mock_snakemake
-        snakemake = mock_snakemake('build_renewable_shapes',regions = 'ws-5')
+        snakemake = mock_snakemake('build_renewable_shapes',regions = 's-20')
     configure_logging(snakemake)
     save_fig = snakemake.config["renewable_zones"]["save_fig"]
 
@@ -307,8 +305,8 @@ if __name__ == "__main__":
                     axis=0), lat[attr_2][sel_lat[attr_2]], lon[attr_2][sel_lon[attr_2]], l1,l2, gran)
 
         #Vector of repeated lats and lons
-        lat_all_gran = np.tile(l2, len(l1))
-        lon_all_gran = np.repeat(l1, len(l2))
+        lat_all_gran = np.tile(l1, len(l2))
+        lon_all_gran = np.repeat(l2, len(l1))
 
         #Create the actual regional k-means model to be solved
         if attr_wc == 'ws':
