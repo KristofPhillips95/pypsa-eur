@@ -220,7 +220,7 @@ rule build_renewable_shapes:
     log: "logs/build_renewable_shapes_{regions}.log"
     threads: 4
     resources: mem_mb=500
-    script: "scripts/build_renewable_shapes.py"
+    script: "scripts/build_renewable_shapes_iteration_v2.py"
 
 # rule build_bus_regions_renewable:
 #     input:
