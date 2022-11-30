@@ -169,7 +169,7 @@ if __name__ == "__main__":
                 rsm.save_to_geojson(gdfs[seed],os.path.join(path_tosave_to,f"ren_clust_{snakemake.wildcards.regions}_{gran}_{seed}"))
 
         if save_fig:
-            rsm.plot_regions_scatter_gran_and_save(lat_all_gran, lon_all_gran, model,labels_dict[seed_min], centroids_dict[seed_min],seed,snakemake.output,gran,attr_wc)
+            rsm.plot_regions_scatter_gran_and_save(lat_all_gran, lon_all_gran, model,labels_dict[seed_min], centroids_dict[seed_min],seed,snakemake.output,gran,snakemake.wildcards.regions)
         rsm.save_to_geojson(gdfs[seed_min],snakemake.output.renewable_shapes)
 
 

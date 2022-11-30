@@ -276,7 +276,6 @@ def plot_regions_scatter_and_save(lat_all, lon_all, ds,attributes,nb_regions,see
 def plot_regions_scatter_gran_and_save(lat_all_gran, lon_all_gran, model,labels,centroids,seed,snakemake_output,gran,attr_wc):
     data = model.data
     fig, axs = plt.subplots(1,data.shape[1] + 1 , figsize=(12, 4))
-    nb_regions = len(np.unique(labels))
 
     colors = [centroids[label, 0] for label in labels]
     axs[0].scatter(lon_all_gran, lat_all_gran, c=colors)
@@ -290,8 +289,9 @@ def plot_regions_scatter_gran_and_save(lat_all_gran, lon_all_gran, model,labels,
 
 
     #fig.suptitle(f'Clustering {attributes[attr_idx]} {nb_regions}')
-    dir_path = os.path.join(snakemake_output.renewable_shapes.partition("resources")[0], "results", "plots")
-    path = os.path.join(dir_path, f"renewable_clusters_scatter_{attr_wc}_{gran}_seed{seed}.png")
+    rdir = snakemake_output.renewable_shapes.partition("/")[2]
+    dir_path = os.path.join(snakemake_output.renewable_shapes.partition("resources")[0], "results", "plots",rdir)
+    path = os.path.join(dir_path, f"renewable_clusters_scatter_{attr_wc}_{gran}.png")
     print(path)
 
     isExist = os.path.exists(dir_path)

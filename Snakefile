@@ -673,7 +673,7 @@ def input_make_summary(w):
         ll=ll,
         **{
             k: config["scenario"][k] if getattr(w, k) == "all" else getattr(w, k)
-            for k in ["simpl", "clusters", "opts"]
+            for k in ["simpl", "clusters", "opts","regions"]
         }
     )
 

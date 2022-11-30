@@ -503,7 +503,7 @@ outputs = [
 
 def make_summaries(networks_dict, paths, config, country="all"):
     columns = pd.MultiIndex.from_tuples(
-        networks_dict.keys(), names=["simpl", "clusters", "ll", "opts"]
+        networks_dict.keys(), names=["simpl", "clusters", "ll", "opts", "regions"]
     )
 
     dfs = {}
@@ -551,10 +551,11 @@ if __name__ == "__main__":
         snakemake = mock_snakemake(
             "make_summary",
             simpl="",
-            clusters="5",
+            clusters="37",
             ll="copt",
-            opts="Co2L-24H",
+            opts="Co2L-12H",
             country="all",
+            regions = "c"
         )
         network_dir = os.path.join(
             "..", "results", "networks", snakemake.config["run"]["name"]
