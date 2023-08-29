@@ -231,14 +231,14 @@ rule build_shapes:
 rule build_renewable_shapes:
     input:
         country_shapes="resources/" + RDIR + "country_shapes.geojson",
-        cutout_solar = "cutouts/" + CDIR + config["renewable_zones"]['cutout']['solar'] + ".nc",
-        cutout_wind = "cutouts/" +CDIR +config["renewable_zones"]['cutout']['wind'] + ".nc"
+        cutout_solar = "cutouts/" + CDIR + config["renewable"]['solar']['cutout'] + ".nc",
+        cutout_wind = "cutouts/" +CDIR +config["renewable"]['onwind']['cutout'] + ".nc"
     output:
         renewable_shapes = 'resources/' +RDIR+ 'renewable_shapes_{regions}.geojson'
     log: "logs/build_renewable_shapes_{regions}.log"
     threads: 10
     resources: mem_mb=500
-    script: "scripts/build_renewable_shapes_iteration_v3.py"
+    script: "scripts/build_renewable_shapes_iteration_v2.py"
 
 
 

@@ -11,6 +11,7 @@ import libpysal
 from spopt.region import RegionKMeansHeuristic
 import shapely
 import pandas as pd
+import atlite
 
 def save_to_geojson(df, fn):
     if os.path.exists(fn):
@@ -167,9 +168,13 @@ def get_lons_lats_from_ds(ds):
         end[attr] = len(lat[attr]) * len(lon[attr])
     return lat, lon
 
-def intersect_lats_lons(lat, lon):
-    b_lat = min(max(lat['s'][:]), max(lat['w'][:]),np.float64(65.))
-    b_lon = min(max(lon['s'][:]), max(lon['w'][:]),np.float64(35.))
+def intersect_lats_lons(lat, lon,single_ds = False):
+    if single_ds:
+        b_lat = min(max(lat['s'][:]), max(lat['w'][:]))
+        b_lon = min(max(lon['s'][:]), max(lon['w'][:]))
+    else:
+        b_lat = min(max(lat['s'][:]), max(lat['w'][:]),np.float64(65.))
+        b_lon = min(max(lon['s'][:]), max(lon['w'][:]),np.float64(35.))
 
     # sel_lat = lat[attr_1] <= b_lat
     # sel_lon = lon[attr_2] <= b_lon
@@ -346,6 +351,16 @@ def load_data_sets(input):
     ds["s"] = nc.Dataset(input.cutout_solar)
     ds["w"] = nc.Dataset(input.cutout_wind)
     return ds
+
+def load_cutouts(input):
+    ds_c = dict()
+    ds_c["s"] = atlite.Cutout(input.cutout_solar)
+    ds_c["w"] = atlite.Cutout(input.cutout_wind)
+    return ds_c
+def convert_to_cf(ds_c):
+    ds_c["w"] = ds_c["w"].wind(turbine="Vestas_V112_3MW", capacity_factor=True)
+    ds_c["s"] = ds_c["s"].pv(panel="CSi", capacity_factor=True, orientation="latitude_optimal")
+    return ds_c
 
 def get_number_of_buddies(point, model):
     cluster = model.labels_[point]

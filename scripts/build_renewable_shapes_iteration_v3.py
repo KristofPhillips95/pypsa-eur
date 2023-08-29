@@ -57,11 +57,11 @@ def get_loc_weight(regions : str):
         loc_weight = 0
     return loc_weight
 
-
 if __name__ == "__main__":
+
     if 'snakemake' not in globals():
         from _helpers import mock_snakemake
-        snakemake = mock_snakemake('build_renewable_shapes',regions = 's-5-loc1')
+        snakemake = mock_snakemake('build_renewable_shapes',regions = 's-5')
     configure_logging(snakemake)
     save_fig = snakemake.config["renewable_zones"]["save_fig"]
     mainland_only = snakemake.config["renewable_zones"]["mainland_only"]
@@ -73,7 +73,8 @@ if __name__ == "__main__":
 
     #Load datasets of era and sara into dict
     ds = rsm.load_data_sets(snakemake.input)
-
+    ds_c = rsm.load_cutouts(snakemake.input)
+    print("Data has been loaded")
 
     #Extract main parameters of clustering method from config file and wildcard
     gran = snakemake.config["renewable_zones"]["granularity"]
@@ -95,16 +96,30 @@ if __name__ == "__main__":
         # Get latitudes and longitudes from the dataset
         lat, lon = rsm.get_lons_lats_from_ds(ds)
         # And select the ones that occur in both datasets
-        sel_lat, sel_lon = rsm.intersect_lats_lons(lat, lon)
+        sel_lat, sel_lon = rsm.intersect_lats_lons(lat, lon,True)
+        #print(sel_lat)
+
         # Rescale lats and lons to desired granularity
         l1, l2 = rsm.get_rescaled_lats_and_lons(lat, lon, sel_lat, sel_lon, gran, attr_wc)
+
+        CF_clustering = True
         # Rescale actual data to desired granularity
-        at_1, pu = rsm.change_data_granularity(
-            np.mean(ds[attr_1][name[attr_1]][:, :, :].data[:, sel_lat[attr_1], :][:, :, sel_lon[attr_1]],
-                    axis=0), lat[attr_1][sel_lat[attr_1]], lon[attr_1][sel_lon[attr_1]], l1, l2, gran)
+        data_to_rescale = dict()
+        if CF_clustering:
+            # Convert input data to capacity factors
+            ds_c = rsm.convert_to_cf(ds_c)
+            data_to_rescale[attr_1] = ds_c[attr_1].data[sel_lat[attr_1],:][:, sel_lon[attr_1]]
+            data_to_rescale[attr_2] = ds_c[attr_2].data[sel_lat[attr_2], :][:, sel_lon[attr_2]]
+        else:
+            data_to_rescale[attr_1] = np.mean(ds[attr_1][name[attr_1]][:, :, :].data[:, sel_lat[attr_1], :][:, :, sel_lon[attr_1]],
+                        axis=0)
+            data_to_rescale[attr_2] = np.mean(ds[attr_2][name[attr_2]][:, :, :].data[:, sel_lat[attr_2], :][:, :, sel_lon[attr_2]],
+                        axis=0)
+
+        at_1, pu = rsm.change_data_granularity(data_to_rescale[attr_1]
+            , lat[attr_1][sel_lat[attr_1]], lon[attr_1][sel_lon[attr_1]], l1, l2, gran)
         at_2, pu = rsm.change_data_granularity(
-            np.mean(ds[attr_2][name[attr_2]][:, :, :].data[:, sel_lat[attr_2], :][:, :, sel_lon[attr_2]],
-                    axis=0), lat[attr_2][sel_lat[attr_2]], lon[attr_2][sel_lon[attr_2]], l1, l2, gran)
+            data_to_rescale[attr_2], lat[attr_2][sel_lat[attr_2]], lon[attr_2][sel_lon[attr_2]], l1, l2, gran)
 
         #Create vector of repeated lats and lons
         lat_all_gran = np.tile(l1, len(l2))
@@ -118,8 +133,7 @@ if __name__ == "__main__":
         elif attr_wc == 's':
             model,data,selection = rsm.generate_regional_kmeans_model_locs(lon_all_gran, lat_all_gran, [at_2,lat_all_gran,lon_all_gran],loc_weight, nb_regions)
 
-
-        # Now we start to actually solve the clustering problem. Seed is given for reproducibility
+ # Now we start to actually solve the clustering problem. Seed is given for reproducibility
         np.random.seed(snakemake.config["renewable_zones"]["seed"])
 
         #Initialize some dictionaries to store informative values
@@ -136,53 +150,48 @@ if __name__ == "__main__":
 
         timer = solve_multiple_times(seeds,gdfs,bl_dict,dist,labels_dict,centroids_dict)
 
-        #Initialize some dictionaries to store informative values
-        dist_per_att = dict()
-        dist_per_seed = dict()
-        bl_sums = dict()
-        circumference = dict()
+    # Initialize some dictionaries to store informative values
+    dist_per_att = dict()
+    dist_per_seed = dict()
+    bl_sums = dict()
+    circumference = dict()
 
+    for seed in dist:
+        bl_sums[seed] = dict()
+        d_per_at = (np.array([dist[seed][c_label].sum(axis=0) for c_label in dist[seed]]).sum(axis=0))
+        dist_per_att[seed] = d_per_at
+        dist_per_seed[seed] = d_per_at.sum()
+        circumference[seed] = (4 - bl_dict[seed]).sum()
+        for n in range(1, 5):
+            bl_sums[seed][n] = np.count_nonzero(bl_dict[seed] == n)
 
-        for seed in dist:
-            bl_sums[seed] = dict()
-            d_per_at = (np.array([dist[seed][c_label].sum(axis=0) for c_label in dist[seed]]).sum(axis=0))
-            dist_per_att[seed] = d_per_at
-            dist_per_seed[seed] = d_per_at.sum()
-            circumference[seed] = (4 - bl_dict[seed]).sum()
-            for n in range(1, 5):
-                bl_sums[seed][n] = np.count_nonzero(bl_dict[seed] == n)
+    path_tosave_to = os.path.join(os.path.dirname(os.path.dirname(snakemake.output.renewable_shapes)), "ren_shapes",
+                                  f"gdfs_{loc_weight}_{parallel}")
+    circ_min = float("inf")
+    seed_min = 0
+    for seed in gdfs:
+        gdfs[seed]["dist_tot"] = dist_per_seed[seed]
+        gdfs[seed]["circumference"] = circumference[seed]
+        gdfs[seed]["total_time"] = timer
 
-        path_tosave_to = os.path.join(os.path.dirname(os.path.dirname(snakemake.output.renewable_shapes)), "ren_shapes" , f"gdfs_{loc_weight}_{parallel}")
-        circ_min = float("inf")
-        seed_min = 0
-        for seed in gdfs:
-            gdfs[seed]["dist_tot"] = dist_per_seed[seed]
-            gdfs[seed]["circumference"] = circumference[seed]
-            gdfs[seed]["total_time"] = timer
+        if circumference[seed] < circ_min:
+            circ_min = circumference[seed]
+            seed_min = seed
 
-            if circumference[seed] < circ_min:
-                circ_min = circumference[seed]
-                seed_min = seed
+        for at in range(len(dist_per_att[seed])):
+            gdfs[seed][f"dist_per_{at}"] = dist_per_att[seed][at]
 
-            for at in range(len(dist_per_att[seed])):
-                gdfs[seed][f"dist_per_{at}"] = dist_per_att[seed][at]
+        # gdfs[seed]["dist_per_att"] = dist_per_att[seed]
 
-            #gdfs[seed]["dist_per_att"] = dist_per_att[seed]
+        if not (os.path.exists(path_tosave_to)):
+            os.makedirs(path_tosave_to)
 
+        if save_all_clusterings:
+            rsm.save_to_geojson(gdfs[seed],
+                                os.path.join(path_tosave_to, f"ren_clust_{snakemake.wildcards.regions}_{gran}_{seed}"))
 
-            if not(os.path.exists(path_tosave_to)):
-                os.makedirs(path_tosave_to)
-
-            if save_all_clusterings:
-                rsm.save_to_geojson(gdfs[seed],os.path.join(path_tosave_to,f"ren_clust_{snakemake.wildcards.regions}_{gran}_{seed}"))
-
-        if save_fig:
-            rsm.plot_regions_scatter_gran_and_save(lat_all_gran, lon_all_gran, model,labels_dict[seed_min], centroids_dict[seed_min],seed,snakemake.output,gran,snakemake.wildcards.regions)
-        rsm.save_to_geojson(gdfs[seed_min],snakemake.output.renewable_shapes)
-
-
-
-
-
-
-
+    if save_fig:
+        rsm.plot_regions_scatter_gran_and_save(lat_all_gran, lon_all_gran, model, labels_dict[seed_min],
+                                               centroids_dict[seed_min], seed, snakemake.output, gran,
+                                               snakemake.wildcards.regions)
+    rsm.save_to_geojson(gdfs[seed_min], snakemake.output.renewable_shapes)

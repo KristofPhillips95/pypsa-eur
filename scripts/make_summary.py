@@ -551,11 +551,11 @@ if __name__ == "__main__":
         snakemake = mock_snakemake(
             "make_summary",
             simpl="",
-            clusters="37",
-            ll="copt",
-            opts="Co2L-12H",
+            clusters="256",
+            ll="v1.5",
+            opts="Co2L-3H",
             country="all",
-            regions = "c"
+            regions = "ws-5"
         )
         network_dir = os.path.join(
             "..", "results", "networks", snakemake.config["run"]["name"]

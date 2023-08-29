@@ -1,0 +1,1 @@
+scp -r Documents/PyPSA_fork/pypsa-eur/scripts/ vsc34888@hpc:/scratch/leuven/348/vsc34888/new_pypsa/first_tests/pypsa-eur

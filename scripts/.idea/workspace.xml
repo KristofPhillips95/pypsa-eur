@@ -2,10 +2,11 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="6ceb5767-28dc-4369-b9df-30ffe1367720" name="Default Changelist" comment="">
-      <change beforePath="$PROJECT_DIR$/../.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/../.gitignore" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/scripts.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/scripts.iml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../Network_plotting_with_ren_shapes.ipynb" beforeDir="false" afterPath="$PROJECT_DIR$/../Network_plotting_with_ren_shapes.ipynb" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../Snakefile" beforeDir="false" afterPath="$PROJECT_DIR$/../Snakefile" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/add_electricity.py" beforeDir="false" afterPath="$PROJECT_DIR$/add_electricity.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/build_renewable_shapes_iteration_v2.py" beforeDir="false" afterPath="$PROJECT_DIR$/build_renewable_shapes_iteration_v2.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/make_summary.py" beforeDir="false" afterPath="$PROJECT_DIR$/make_summary.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -98,9 +99,9 @@
       <method v="2" />
     </configuration>
     <list>
-      <item itemvalue="Python.cluster_network" />
-      <item itemvalue="Python.build_powerplants" />
       <item itemvalue="Python.add_electricity" />
+      <item itemvalue="Python.build_powerplants" />
+      <item itemvalue="Python.cluster_network" />
     </list>
     <recent_temporary>
       <list>
